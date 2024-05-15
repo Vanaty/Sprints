@@ -2,8 +2,8 @@
 setlocal enabledelayedexpansion
 
 :: Déclaration des variables
-set "war_name=hello"
-set "work_dir=F:\MrAina\hello"
+set "war_name=framework"
+set "work_dir=C:\Users\itu\Documents\GitHub\Sprint\test"
 set "temp=%work_dir%\temp"
 set "web=%work_dir%\web"
 set "config_xml=%work_dir%\config"
