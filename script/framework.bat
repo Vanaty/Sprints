@@ -3,11 +3,19 @@ setlocal enabledelayedexpansion
 
 :: Déclaration des variables
 set "jar_name=framework_servlet"
-set "work_dir=C:\Users\itu\Documents\GitHub\Sprint\FrameWork\P01"
+set "work_dir=C:\Users\itu\Documents\GitHub\Sprint"
 set "servlet_path=C:\apache-tomcat-11.0.0-M4\lib\servlet-api.jar"
+
 set "temp=%work_dir%\temp"
-set "lib=%work_dir%\lib"
 set "src=%work_dir%\src"
+
+@REM CHEMIN AMETRAHANA ANLE LIB
+set "lib=%work_dir%\test\lib"
+
+:: Effacer le dossier [temp]
+if exist "%lib%" (
+    rd /s /q "%lib%"
+)
 
 :: Effacer le dossier [temp]
 if exist "%temp%" (
@@ -16,7 +24,7 @@ if exist "%temp%" (
 
 :: Créer la structure de dossier
 mkdir "%temp%\classes"
-
+mkdir "%lib%"
 :: Compilation des fichiers .java dans src avec les options suivantes
 :: Note: Assurez-vous que le chemin vers le compilateur Java (javac) est correctement configuré dans votre variable d'environnement PATH.
 :: Créer une liste de tous les fichiers .java dans le répertoire src et ses sous-répertoires
@@ -29,5 +37,9 @@ del sources.txt
 cd "%temp%\classes"
 jar cvf "%lib%\%jar_name%.jar" *
 
+cd "%work_dir%"
+if exist "%temp%" (
+    rd /s /q "%temp%"
+)
 echo Cretion Jar Terminer.
 pause
