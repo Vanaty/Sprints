@@ -8,22 +8,23 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.List;
-
-import mg.itu.annotation.Controleur;
+import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
 
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import mg.itu.annotation.Controleur;
+import mg.itu.annotation.GET;
+import mg.itu.util.Mapping;
 
 public class FrontControleur extends HttpServlet {
-    private boolean isScanned = false;
-    private List<String> controleurs;
+    private Map<String,Mapping> controleurs = new HashMap<>();
 
-    private List<String> scannePackage(String cPackage) throws ClassNotFoundException {
+    private void scannePackage(String cPackage) throws ClassNotFoundException {
         if (cPackage == null) {
             ServletContext sc = getServletContext();
             cPackage = sc.getInitParameter("packageControleur");
@@ -31,7 +32,6 @@ public class FrontControleur extends HttpServlet {
 
         String path = cPackage.replace(".", "/");
         File directory = new File(Thread.currentThread().getContextClassLoader().getResource(path).getFile());
-        List<String> nameClasses = new ArrayList<>();
         if (directory.exists()) {
             File[] files = directory.listFiles();
             for (File file : files) {
@@ -40,30 +40,39 @@ public class FrontControleur extends HttpServlet {
                     Class class1 = Class.forName(className);
                     Annotation annotation = class1.getAnnotation(Controleur.class);
                     if (annotation != null) {
-                        nameClasses.add(class1.getName());
+                        this.setMapping(class1);
                     }
                 } else if (file.isDirectory()) {
                     String newPackage = cPackage + "." + file.getName();
-                    List<String> newList = scannePackage(newPackage);
-                    nameClasses.addAll(newList);
+                    scannePackage(newPackage);
                 }
             }
         }
-        return nameClasses;
+    }
+
+    private void setMapping(Class c) {
+        Method[] methodes = c.getMethods();
+        for (int j = 0; j < methodes.length; j++) {
+            GET annotGet = methodes[j].getAnnotation(GET.class); 
+            if ( annotGet !=null ) {
+                controleurs.put(annotGet.value(), new Mapping(c.getName() , methodes[j].getName()));
+            }
+        }
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
-        try ( PrintWriter out = response.getWriter()) {
-            if (!isScanned) {
-                controleurs = this.scannePackage(null); 
-                isScanned = true;
+        try(PrintWriter out = response.getWriter()) {
+            out.println("<ul>");
+            for (String k: controleurs.keySet()) {
+                out.println("<li><h1>"+ k +"</h1><ul>");
+                Mapping mapping = controleurs.get(k);
+                out.println("<li><strong>Nom class</strong>:" + mapping.getClassName() + "<br>");
+                out.println("<strong>Methode:</strong>" + mapping.getMethodName() + "</li>");
+                out.println("</ul></li>");
             }
-            for (String string : controleurs) {
-                out.println(string + "<br>");
-            }
-        } catch (ClassNotFoundException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -79,6 +88,16 @@ public class FrontControleur extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         processRequest(request, response);
+    }
+
+    @Override
+    public void init() throws ServletException {
+        super.init();
+        try {
+            this.scannePackage(null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     /**
