@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 :: Déclaration des variables
 set "jar_name=framework_servlet"
-set "work_dir=C:\Users\itu\Documents\GitHub\Sprint"
+set "work_dir=C:\Users\itu\Documents\GitHub\Sprints"
 set "servlet_path=C:\apache-tomcat-11.0.0-M4\lib\servlet-api.jar"
 
 set "temp=%work_dir%\temp"
