@@ -53,9 +53,10 @@ public class FrontControleur extends HttpServlet {
     private void setMapping(Class c) {
         Method[] methodes = c.getMethods();
         for (int j = 0; j < methodes.length; j++) {
-            GET annotGet = methodes[j].getAnnotation(GET.class); 
+            GET annotGet = methodes[j].getAnnotation(GET.class);
             if ( annotGet !=null ) {
-                controleurs.put(annotGet.value(), new Mapping(c.getName() , methodes[j].getName()));
+                String url = (annotGet.value().charAt(0) == '/') ? annotGet.value() : "/" + annotGet.value();
+                controleurs.put(url, new Mapping(c.getName() , methodes[j].getName()));
             }
         }
     }
@@ -64,16 +65,20 @@ public class FrontControleur extends HttpServlet {
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
         try(PrintWriter out = response.getWriter()) {
-            out.println("<ul>");
-            for (String k: controleurs.keySet()) {
-                out.println("<li><h1>"+ k +"</h1><ul>");
-                Mapping mapping = controleurs.get(k);
-                out.println("<li><strong>Nom class</strong>:" + mapping.getClassName() + "<br>");
-                out.println("<strong>Methode:</strong>" + mapping.getMethodName() + "</li>");
-                out.println("</ul></li>");
+            String requestUrl = request.getRequestURI().replace(request.getContextPath(), "");
+            Mapping mapping = controleurs.getOrDefault(requestUrl, null);
+            if (mapping == null) {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND,  "La ressource demandée ["+requestUrl+"] n'est pas disponible");
+                return;
             }
+            out.println("<ul>");
+            out.println("<li><h1>"+ requestUrl +"</h1><ul>");
+            out.println("<li><strong>Nom class</strong>:" + mapping.getClassName() + "</li>");
+            out.println("<li><strong>Methode:</strong>" + mapping.getMethodName() + "</li>");
+            out.println("<li><strong>Content:</strong>"+ mapping.getResponse() +"</li>");
+            out.println("</ul></li>");
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new ServletException(e);
         }
     }
 
