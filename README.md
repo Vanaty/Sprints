@@ -1,9 +1,9 @@
 # Sprint
  Sprint exam Mr Naina
 
-# Instalation ⚒
+# Instalation⚒
   Parametre dans `web.xml`
-  ## Required ☣
+  ### Required☣
    `packageControleur` | package a scanner
   ```xml
 <?xml version="1.0" encoding="UTF-8"?>
