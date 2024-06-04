@@ -28,5 +28,5 @@
 </web-app>
  ```
   ### Exemple url-pattern accepted
-  /</br>
-  /path/*
+  - /</br>
+  - /path/*
