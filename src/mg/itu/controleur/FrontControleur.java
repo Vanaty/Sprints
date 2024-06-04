@@ -12,6 +12,7 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
+import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -61,24 +62,42 @@ public class FrontControleur extends HttpServlet {
         }
     }
 
+    private String getRequestUrl(HttpServletRequest request) {
+        String urlPattern = request.getHttpServletMapping().getPattern().replace("*", "");
+        String requestUrl = request.getRequestURI()
+                            .replace(request.getContextPath(), "")
+                            .replace(urlPattern,"");
+        requestUrl = (requestUrl.startsWith("/")) ? requestUrl : "/" + requestUrl;
+        return requestUrl;
+    }
+
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
         try(PrintWriter out = response.getWriter()) {
-            String requestUrl = request.getRequestURI().replace(request.getContextPath(), "");
+            String requestUrl = getRequestUrl(request);
             Mapping mapping = controleurs.getOrDefault(requestUrl, null);
             if (mapping == null) {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND,  "La ressource demandée ["+requestUrl+"] n'est pas disponible");
                 return;
             }
-            out.println("<ul>");
-            out.println("<li><h1>"+ requestUrl +"</h1><ul>");
-            out.println("<li><strong>Nom class</strong>:" + mapping.getClassName() + "</li>");
-            out.println("<li><strong>Methode:</strong>" + mapping.getMethodName() + "</li>");
-            out.println("<li><strong>Content:</strong>"+ mapping.getResponse() +"</li>");
-            out.println("</ul></li>");
+            
+            // Gestion de reponse
+            Object rep = mapping.getResponse();
+            if(rep == null) {
+                return;
+            }
+            
+            if(rep.getClass().getTypeName().equals(String.class.getTypeName())) {
+                out.println(rep.toString());
+            } else if (rep.getClass().getTypeName().equals(ModelView.class.getTypeName())) {
+                ModelView mv = (ModelView) rep;
+                RequestDispatcher dispatcher = request.getRequestDispatcher(mv.getUrlDestionation());
+                mv.setAttributs(request);
+                dispatcher.forward(request, response);
+            }
         } catch (Exception e) {
-            throw new ServletException(e);
+            throw new ServletException("Erreur processRequest",e);
         }
     }
 
