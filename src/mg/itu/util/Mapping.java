@@ -3,6 +3,8 @@ package mg.itu.util;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
+import mg.itu.controleur.ModelView;
+
 public class Mapping {
     String className;
     String methodName;
@@ -15,13 +17,13 @@ public class Mapping {
 
     }
 
-    public String getResponse() throws ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, SecurityException, InvocationTargetException {
+    public Object getResponse() throws ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, SecurityException, InvocationTargetException {
         Class class1 = Class.forName(this.getClassName());
-        Object instance = class1.newInstance();
+        Object instance = class1.getConstructor().newInstance();
         Method m = class1.getMethod(methodName);
-        return (String) m.invoke(instance);
+        return m.invoke(instance);
     }
-    
+
     public String getClassName() {
         return className;
     }
