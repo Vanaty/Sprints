@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,14 +26,19 @@ import mg.itu.util.Mapping;
 public class FrontControleur extends HttpServlet {
     private Map<String,Mapping> controleurs = new HashMap<>();
 
-    private void scannePackage(String cPackage) throws ClassNotFoundException {
+    private void scannePackage(String cPackage) throws Exception {
         if (cPackage == null) {
             ServletContext sc = getServletContext();
             cPackage = sc.getInitParameter("packageControleur");
         }
 
         String path = cPackage.replace(".", "/");
-        File directory = new File(Thread.currentThread().getContextClassLoader().getResource(path).getFile());
+        URL url = Thread.currentThread().getContextClassLoader().getResource(path);
+        if(url == null) {
+            throw new Exception("Le package ["+ cPackage +"] n'existe pas");
+        }
+
+        File directory = new File(url.getFile());
         if (directory.exists()) {
             File[] files = directory.listFiles();
             for (File file : files) {
@@ -51,12 +57,16 @@ public class FrontControleur extends HttpServlet {
         }
     }
 
-    private void setMapping(Class c) {
+    private void setMapping(Class c) throws Exception {
         Method[] methodes = c.getMethods();
         for (int j = 0; j < methodes.length; j++) {
             GET annotGet = methodes[j].getAnnotation(GET.class);
             if ( annotGet !=null ) {
                 String url = (annotGet.value().charAt(0) == '/') ? annotGet.value() : "/" + annotGet.value();
+                
+                if (controleurs.containsKey(url)) {
+                    throw new Exception("Duplicate url ["+ url +"] dans "+ c.getName() + " et "+ controleurs.get(url).getClassName());
+                }
                 controleurs.put(url, new Mapping(c.getName() , methodes[j].getName()));
             }
         }
@@ -85,6 +95,7 @@ public class FrontControleur extends HttpServlet {
             // Gestion de reponse
             Object rep = mapping.getResponse();
             if(rep == null) {
+                response.sendError(HttpServletResponse.SC_NO_CONTENT, "Pas de type de retour");
                 return;
             }
             
@@ -97,7 +108,7 @@ public class FrontControleur extends HttpServlet {
                 dispatcher.forward(request, response);
             }
         } catch (Exception e) {
-            throw new ServletException("Erreur processRequest",e);
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
 
@@ -119,8 +130,11 @@ public class FrontControleur extends HttpServlet {
         super.init();
         try {
             this.scannePackage(null);
+            if (controleurs.size() == 0) {
+                throw new ServletException("Pas de path trouver");
+            }
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new ServletException(e.getMessage(), e.getCause());
         }
     }
 
