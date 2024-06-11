@@ -67,7 +67,8 @@ public class FrontControleur extends HttpServlet {
                 if (controleurs.containsKey(url)) {
                     throw new Exception("Duplicate url ["+ url +"] dans "+ c.getName() + " et "+ controleurs.get(url).getClassName());
                 }
-                controleurs.put(url, new Mapping(c.getName() , methodes[j].getName()));
+                Mapping map = new Mapping(c.getName() , methodes[j].getName(), methodes[j].getParameterTypes());
+                controleurs.put(url, map);
             }
         }
     }
@@ -84,7 +85,9 @@ public class FrontControleur extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
-        try(PrintWriter out = response.getWriter()) {
+        try {
+            PrintWriter out = response.getWriter();
+
             String requestUrl = getRequestUrl(request);
             Mapping mapping = controleurs.getOrDefault(requestUrl, null);
             if (mapping == null) {
@@ -93,7 +96,7 @@ public class FrontControleur extends HttpServlet {
             }
             
             // Gestion de reponse
-            Object rep = mapping.getResponse();
+            Object rep = mapping.getResponse(request);
             if(rep == null) {
                 response.sendError(HttpServletResponse.SC_NO_CONTENT, "Pas de type de retour");
                 return;
@@ -106,9 +109,12 @@ public class FrontControleur extends HttpServlet {
                 RequestDispatcher dispatcher = request.getRequestDispatcher(mv.getUrlDestionation());
                 mv.setAttributs(request);
                 dispatcher.forward(request, response);
+            } else {
+                response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Type de retour non supporter");
             }
+
         } catch (Exception e) {
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
+            throw new ServletException(e.getMessage(), e.getCause());
         }
     }
 
