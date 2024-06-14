@@ -44,7 +44,7 @@ public class FrontControleur extends HttpServlet {
             for (File file : files) {
                 if(file.isFile() && file.getName().endsWith(".class")) {
                     String className = cPackage + '.' + file.getName().substring(0, file.getName().length() - 6);
-                    Class class1 = Class.forName(className);
+                    Class<?> class1 = Class.forName(className);
                     Annotation annotation = class1.getAnnotation(Controleur.class);
                     if (annotation != null) {
                         this.setMapping(class1);
@@ -57,7 +57,7 @@ public class FrontControleur extends HttpServlet {
         }
     }
 
-    private void setMapping(Class c) throws Exception {
+    private void setMapping(Class<?> c) throws Exception {
         Method[] methodes = c.getMethods();
         for (int j = 0; j < methodes.length; j++) {
             GET annotGet = methodes[j].getAnnotation(GET.class);
@@ -67,7 +67,7 @@ public class FrontControleur extends HttpServlet {
                 if (controleurs.containsKey(url)) {
                     throw new Exception("Duplicate url ["+ url +"] dans "+ c.getName() + " et "+ controleurs.get(url).getClassName());
                 }
-                Mapping map = new Mapping(c.getName() , methodes[j].getName(), methodes[j].getParameterTypes());
+                Mapping map = new Mapping(c.getName() , methodes[j].getName(), methodes[j].getParameters());
                 controleurs.put(url, map);
             }
         }
