@@ -1,14 +1,14 @@
 package mg.itu.util;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+
+import com.thoughtworks.paranamer.AdaptiveParanamer;
+import com.thoughtworks.paranamer.Paranamer;
 
 import jakarta.servlet.http.HttpServletRequest;
 import mg.itu.annotation.Param;
@@ -17,6 +17,9 @@ public class Mapping {
     String className;
     String methodName;
     Parameter[] parameters;
+    String[] parameterNames;
+
+    private Paranamer paranamer = new AdaptiveParanamer();
 
     public Mapping(String className, String methodName, Parameter[] parameters) {
         setClassName(className);
@@ -34,11 +37,20 @@ public class Mapping {
     }
 
     private Object cast(Class<?> type, Object value) {
+        String typeName = type.getSimpleName().toLowerCase();
+        if (typeName.contains("int")) {
+            return Integer.parseInt(value.toString());
+        } else if (typeName.equals("double")) {
+            return Double.parseDouble(value.toString());
+        } else if (typeName.equals("float")) {
+            return Float.parseFloat(value.toString());
+        } else if (typeName.equals("boolean")) {
+            return Boolean.parseBoolean(value.toString());
+        }
         return value;
     }
 
     private Object getInstance(Class<?> c) throws Exception {
-        System.out.println(c.getName());
         return c.getConstructor().newInstance();
     }
 
@@ -47,50 +59,56 @@ public class Mapping {
         Object instance = class1.getConstructor().newInstance();
         Method method = class1.getMethod(methodName, getParameterTypes());
 
+        // instance non Primitive Parameter
         Map<String, Object> mapInstances =  new HashMap<>();
-        
-        Object[] params = new Object[method.getParameterCount()];
+
+        //Argument anle method controleur
+        Object[] paramValues = new Object[method.getParameterCount()];
+
+        for (int index = 0; index < parameters.length; index++) {
+            if (parameters[index].getType().isPrimitive()) {
+                continue;
+            }
+
+            String key = getParameterName(method, parameters[index]);
+            Object model = getInstance(parameters[index].getType());
+            mapInstances.put(key, model);
+            paramValues[index] = model;
+        }
+
         Enumeration<String> values = request.getParameterNames();
-
         while (values.hasMoreElements()) {
-            String name = values.nextElement();
-            
+            String reqKey = values.nextElement();
+            String[] data = reqKey.split("\\.");
+
             for (int i = 0; i < parameters.length; i++) {
+                String paramKey = getParameterName(method, parameters[i]);
                 //Object 
-                if (!parameters[i].getType().isPrimitive()) {
-                    String[] data = name.split("\\.");
-                    Object model = null;
-                    if(mapInstances.containsKey(data[0])) {
-                        model = mapInstances.get(data[0]);
-                    } else {
-                        model = getInstance(parameters[i].getType());
-                        mapInstances.put(data[0], model);
-                        params[i] = mapInstances.get(data[0]);
-                    }
-
-                    Object[] value = { request.getParameter(name) };
+                if (paramKey.equals(data[0]) && data.length > 1) {
+                    Object model = mapInstances.get(data[0]);
                     Method m = getMethod(model.getClass(), data[1]);
+                    Object value = cast(m.getParameterTypes()[0], request.getParameter(reqKey));
                     m.invoke(model, value);
-                }
-
-
-                // argument = parameter.Name
-                else if(parameters[i].getName().equals(name)) {
-                    params[i] = request.getParameter(name);
-                }
-
-                
-                //par annotation
-                else if (parameters[i].isAnnotationPresent(Param.class)) {
-                    String val = parameters[i].getAnnotation(Param.class).value();
-                    if(val.equals(name)) {
-                        params[i] = request.getParameter(name);
-                    }
+                } else if(paramKey.equals(reqKey)) {
+                    paramValues[i] = cast(parameters[i].getType(), request.getParameter(reqKey));
                 }
             }
         }
 
-        return method.invoke(instance, params);
+        return method.invoke(instance, paramValues);
+    }
+
+    private String getParameterName(Method method, Parameter param) throws Exception {
+        if (param.isAnnotationPresent(Param.class)) {
+            return param.getAnnotation(Param.class).value();
+        }
+
+        // for (int i = 0; i < parameters.length; i++) {
+        //     if (parameters[i].equals(param)) {
+        //         return getParameterNames()[i];
+        //     }
+        // }
+        return param.getName();
     }
 
     private String toSetters(String name) {
@@ -100,7 +118,6 @@ public class Mapping {
     private Method getMethod(Class<?> c, String fieldName) throws Exception {
         Class<?> fieldType = c.getDeclaredField(fieldName).getType();
         String fieldSetter = toSetters(fieldName);
-        System.out.println(fieldSetter + fieldType.toString());
         return c.getMethod(fieldSetter, fieldType);
     }
 
@@ -131,6 +148,15 @@ public class Mapping {
 
     public Parameter[] getParameters() {
         return parameters;
+    }
+
+    public String[] getParameterNames() throws Exception {
+        if (parameterNames == null) {
+            Class<?> class1 = Class.forName(this.getClassName());
+            Method method = class1.getMethod(methodName, getParameterTypes());
+            parameterNames = paranamer.lookupParameterNames(method);
+        }
+        return parameterNames;
     }
 
     public void setParameters(Parameter[] parameters) {
