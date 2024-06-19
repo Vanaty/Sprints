@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.thoughtworks.paranamer.AdaptiveParanamer;
+import com.thoughtworks.paranamer.BytecodeReadingParanamer;
 import com.thoughtworks.paranamer.Paranamer;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,7 +20,7 @@ public class Mapping {
     Parameter[] parameters;
     String[] parameterNames;
 
-    private Paranamer paranamer = new AdaptiveParanamer();
+    private Paranamer paranamer = new BytecodeReadingParanamer();
 
     public Mapping(String className, String methodName, Parameter[] parameters) {
         setClassName(className);
