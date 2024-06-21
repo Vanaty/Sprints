@@ -114,7 +114,7 @@ public class FrontControleur extends HttpServlet {
             }
 
         } catch (Exception e) {
-            throw new ServletException(e.getMessage(), e.getCause());
+            throw new ServletException(e);
         }
     }
 
