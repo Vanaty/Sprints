@@ -1,5 +1,6 @@
 package mg.itu.util;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Enumeration;
@@ -48,9 +49,20 @@ public class Mapping {
         return c.getConstructor().newInstance();
     }
 
+
+    private void injectSession(Object instance, HttpServletRequest request) throws IllegalArgumentException, IllegalAccessException {
+        for ( Field field : instance.getClass().getDeclaredFields()) {
+            if (field.getType().equals(Session.class)) {
+                field.setAccessible(true);
+                field.set(instance, new Session(request.getSession()));
+            }
+        }
+    }
+
     public Object getResponse(HttpServletRequest request) throws Exception {
         Class<?> class1 = Class.forName(this.getClassName());
         Object instance = class1.getConstructor().newInstance();
+        injectSession(instance, request);
         Method method = class1.getMethod(methodName, getParameterTypes());
 
         // instance non Primitive Parameter
