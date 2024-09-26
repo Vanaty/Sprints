@@ -9,9 +9,17 @@ public class ModelView {
     String urlDestination;
     Map<String,Object> data;
     
+    public Map<String, Object> getData() {
+        return data;
+    }
+
     public ModelView(String view) {
         data = new HashMap<>();
         setUrlDestionation(view);
+    }
+
+    public ModelView() {
+        data = new HashMap<>();
     }
 
     protected String getUrlDestionation() {
