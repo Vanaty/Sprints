@@ -1,6 +1,8 @@
 package mg.itu.util;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Enumeration;
@@ -8,13 +10,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
+import mg.itu.annotation.Controleur;
 import mg.itu.annotation.Param;
+import mg.itu.annotation.Restapi;
 
 public class Mapping {
     String className;
     String methodName;
     Parameter[] parameters;
     String[] parameterNames;
+
 
     public Mapping(String className, String methodName, Parameter[] parameters) {
         setClassName(className);
@@ -62,8 +67,8 @@ public class Mapping {
     public Object getResponse(HttpServletRequest request) throws Exception {
         Class<?> class1 = Class.forName(this.getClassName());
         Object instance = class1.getConstructor().newInstance();
-        injectSession(instance, request);
         Method method = class1.getMethod(methodName, getParameterTypes());
+        injectSession(instance, request);
 
         // instance non Primitive Parameter
         Map<String, Object> mapInstances =  new HashMap<>();
@@ -122,6 +127,12 @@ public class Mapping {
         // return param.getName();
     }
 
+    public boolean isRestapi() throws ClassNotFoundException, NoSuchMethodException, SecurityException {
+        Class<?> class1 = Class.forName(className);
+        Method method = class1.getMethod(methodName, getParameterTypes());
+        return method.isAnnotationPresent(Restapi.class);
+    }
+
     private String toSetters(String name) {
         return "set" + name.substring(0,1).toUpperCase() + name.substring(1);
     }
@@ -152,6 +163,7 @@ public class Mapping {
     public String getMethodName() {
         return methodName;
     }
+
 
     public void setMethodName(String methodName) {
         this.methodName = methodName;
