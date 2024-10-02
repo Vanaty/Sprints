@@ -23,13 +23,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import mg.itu.annotation.Controleur;
 import mg.itu.annotation.GET;
+import mg.itu.annotation.POST;
+import mg.itu.annotation.Url;
 import mg.itu.util.Mapping;
 
 public class FrontControleur extends HttpServlet {
     private final String INIT_PACKAGE = "package_controleur";
 
 
-    private Map<String,Mapping> controleurs = new HashMap<>();
+    private Map<String, Mapping> controleurs = new HashMap<>();
 
     private void scannePackage(String cPackage) throws Exception {
         if (cPackage == null) {
@@ -65,14 +67,24 @@ public class FrontControleur extends HttpServlet {
     private void setMapping(Class<?> c) throws Exception {
         Method[] methodes = c.getMethods();
         for (int j = 0; j < methodes.length; j++) {
-            GET annotGet = methodes[j].getAnnotation(GET.class);
-            if ( annotGet !=null ) {
-                String url = (annotGet.value().charAt(0) == '/') ? annotGet.value() : "/" + annotGet.value();
-                
+            Url annotUrl = methodes[j].getAnnotation(Url.class);
+            if ( annotUrl !=null ) {
+                String url = (annotUrl.value().charAt(0) == '/') ? annotUrl.value() : "/" + annotUrl.value();
                 if (controleurs.containsKey(url)) {
                     throw new Exception("Duplicate url ["+ url +"] dans "+ c.getName() + " et "+ controleurs.get(url).getClassName());
                 }
-                Mapping map = new Mapping(c.getName() , methodes[j].getName(), methodes[j].getParameters());
+
+                Mapping map = new Mapping(
+                    c.getName(),
+                    methodes[j].getName(), 
+                    methodes[j].getParameters()
+                );
+
+                if (methodes[j].isAnnotationPresent(POST.class)) {
+                    map.addVerb("POST");
+                } else {
+                    map.addVerb("GET");
+                }
                 controleurs.put(url, map);
             }
         }
@@ -95,8 +107,14 @@ public class FrontControleur extends HttpServlet {
 
             String requestUrl = getRequestUrl(request);
             Mapping mapping = controleurs.getOrDefault(requestUrl, null);
+
             if (mapping == null) {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND,  "La ressource demandée ["+requestUrl+"] n'est pas disponible");
+                return;
+            }
+
+            if (!mapping.isMethodAllowed(request.getMethod())) {
+                response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
                 return;
             }
             
@@ -120,9 +138,9 @@ public class FrontControleur extends HttpServlet {
                 }
             } 
             
-            else if(rep.getClass().getTypeName().equals(String.class.getTypeName())) {
+            else if(rep instanceof String) {
                 out.println(rep.toString());
-            } else if (rep.getClass().getTypeName().equals(ModelView.class.getTypeName())) {
+            } else if (rep instanceof ModelView) {
                 ModelView mv = (ModelView) rep;
                 RequestDispatcher dispatcher = request.getRequestDispatcher(mv.getUrlDestionation());
                 mv.setAttributs(request);
@@ -140,6 +158,7 @@ public class FrontControleur extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        
         processRequest(request, response);
     }
     

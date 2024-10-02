@@ -1,22 +1,21 @@
 package mg.itu.util;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
-import mg.itu.annotation.Controleur;
 import mg.itu.annotation.Param;
 import mg.itu.annotation.Restapi;
 
 public class Mapping {
-    String className;
-    String methodName;
+    String className, methodName;
+    List<String> verbs = new ArrayList<>();
     Parameter[] parameters;
     String[] parameterNames;
 
@@ -33,7 +32,7 @@ public class Mapping {
     }
 
     public Mapping() {
-
+        
     }
 
     private Object cast(Class<?> type, Object value) {
@@ -176,4 +175,12 @@ public class Mapping {
     public void setParameters(Parameter[] parameters) {
         this.parameters = parameters;
     }    
+
+    public void addVerb(String verb) {
+        this.verbs.add(verb);
+    }
+
+    public boolean isMethodAllowed(String method) {
+        return this.verbs.contains(method);
+    }
 }
