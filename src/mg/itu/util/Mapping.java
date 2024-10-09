@@ -14,25 +14,14 @@ import mg.itu.annotation.Param;
 import mg.itu.annotation.Restapi;
 
 public class Mapping {
-    String className, methodName;
-    List<String> verbs = new ArrayList<>();
-    Parameter[] parameters;
-    String[] parameterNames;
+    List<VerbAction> verbActions = new ArrayList<>();
 
-
-    public Mapping(String className, String methodName, Parameter[] parameters) {
-        setClassName(className);
-        setParameters(parameters);
-        setMethodName(methodName);
-    }
-
-    public Mapping(String className, String methodName) {
-        setClassName(className);
-        setMethodName(methodName);
-    }
-
-    public Mapping() {
-        
+    public void addVerbAction(String verb,Class <?> cls, Method method) throws Exception {
+        VerbAction va = getVerbAction(verb);
+        if (va != null) {
+            throw new Exception("Duplicate Method dans ["+ cls.getName() +"."+ method.getName() + "] et [" + va.getCls().getName() +"."+ va.getMethod().getName() + "]");
+        }
+        verbActions.add(new VerbAction(verb, cls, method));
     }
 
     private Object cast(Class<?> type, Object value) {
@@ -49,10 +38,6 @@ public class Mapping {
         return value;
     }
 
-    private Object getInstance(Class<?> c) throws Exception {
-        return c.getConstructor().newInstance();
-    }
-
 
     private void injectSession(Object instance, HttpServletRequest request) throws IllegalArgumentException, IllegalAccessException {
         for ( Field field : instance.getClass().getDeclaredFields()) {
@@ -63,15 +48,29 @@ public class Mapping {
         }
     }
 
+    private VerbAction getVerbAction(String verb) {
+        for (VerbAction va : verbActions) {
+            if (va.isVerbAllowed(verb)) {
+                return va;
+            }
+        }
+        return null;
+    }
+
+    private Object getInstance(Class<?> c) throws Exception {
+        return c.getConstructor().newInstance();
+    }
+
     public Object getResponse(HttpServletRequest request) throws Exception {
-        Class<?> class1 = Class.forName(this.getClassName());
-        Object instance = class1.getConstructor().newInstance();
-        Method method = class1.getMethod(methodName, getParameterTypes());
+        VerbAction va = getVerbAction(request.getMethod());
+        Object instance = getInstance(va.getCls());
+        Method method = va.getMethod();
+        Parameter[] parameters = method.getParameters();
+
         injectSession(instance, request);
 
         // instance non Primitive Parameter
         Map<String, Object> mapInstances =  new HashMap<>();
-
         //Argument anle method controleur
         Object[] paramValues = new Object[method.getParameterCount()];
 
@@ -126,9 +125,14 @@ public class Mapping {
         // return param.getName();
     }
 
-    public boolean isRestapi() throws ClassNotFoundException, NoSuchMethodException, SecurityException {
-        Class<?> class1 = Class.forName(className);
-        Method method = class1.getMethod(methodName, getParameterTypes());
+    private Method getMethod(Class<?> c, String fieldName) throws Exception {
+        Class<?> fieldType = c.getDeclaredField(fieldName).getType();
+        String fieldSetter = toSetters(fieldName);
+        return c.getMethod(fieldSetter, fieldType);
+    }
+
+    public boolean isRestapi(String verb) throws ClassNotFoundException, NoSuchMethodException, SecurityException {
+        Method method = getVerbAction(verb).getMethod();
         return method.isAnnotationPresent(Restapi.class);
     }
 
@@ -136,51 +140,12 @@ public class Mapping {
         return "set" + name.substring(0,1).toUpperCase() + name.substring(1);
     }
 
-    private Method getMethod(Class<?> c, String fieldName) throws Exception {
-        Class<?> fieldType = c.getDeclaredField(fieldName).getType();
-        String fieldSetter = toSetters(fieldName);
-        return c.getMethod(fieldSetter, fieldType);
-    }
-
-
-    private Class<?>[] getParameterTypes() {
-        Class<?>[] types = new Class[parameters.length];
-        for (int i = 0; i < types.length; i++) {
-            types[i] = parameters[i].getType();
-        }
-        return types;
-    }
-
-    public String getClassName() {
-        return className;
-    }
-
-    public void setClassName(String className) {
-        this.className = className;
-    }
-
-    public String getMethodName() {
-        return methodName;
-    }
-
-
-    public void setMethodName(String methodName) {
-        this.methodName = methodName;
-    }
-
-    public Parameter[] getParameters() {
-        return parameters;
-    }
-
-    public void setParameters(Parameter[] parameters) {
-        this.parameters = parameters;
-    }    
-
-    public void addVerb(String verb) {
-        this.verbs.add(verb);
-    }
-
     public boolean isMethodAllowed(String method) {
-        return this.verbs.contains(method);
+        for (VerbAction verbAction : verbActions) {
+            if (verbAction.isVerbAllowed(method)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -70,20 +70,18 @@ public class FrontControleur extends HttpServlet {
             Url annotUrl = methodes[j].getAnnotation(Url.class);
             if ( annotUrl !=null ) {
                 String url = (annotUrl.value().charAt(0) == '/') ? annotUrl.value() : "/" + annotUrl.value();
+                Mapping map;
                 if (controleurs.containsKey(url)) {
-                    throw new Exception("Duplicate url ["+ url +"] dans "+ c.getName() + " et "+ controleurs.get(url).getClassName());
+                    map = controleurs.get(url);
+                } else {
+                    map = new Mapping();
                 }
 
-                Mapping map = new Mapping(
-                    c.getName(),
-                    methodes[j].getName(), 
-                    methodes[j].getParameters()
-                );
-
                 if (methodes[j].isAnnotationPresent(POST.class)) {
-                    map.addVerb("POST");
-                } else {
-                    map.addVerb("GET");
+                    map.addVerbAction("POST", c, methodes[j]);
+                }
+                if(methodes[j].isAnnotationPresent(GET.class)) {
+                    map.addVerbAction("GET", c, methodes[j]);
                 }
                 controleurs.put(url, map);
             }
@@ -125,7 +123,7 @@ public class FrontControleur extends HttpServlet {
                 return;
             }
 
-            if (mapping.isRestapi()) {
+            if (mapping.isRestapi(request.getMethod())) {
                 response.setContentType("text/json");
                 Gson json = new Gson();
                 if (rep instanceof ModelView) {
