@@ -122,7 +122,6 @@ public class Mapping {
         } else {
             throw new Exception("ETU002643:Erreur annotation");
         }
-        // return param.getName();
     }
 
     private Method getMethod(Class<?> c, String fieldName) throws Exception {
