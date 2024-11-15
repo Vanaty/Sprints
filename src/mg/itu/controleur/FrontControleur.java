@@ -118,8 +118,7 @@ public class FrontControleur extends HttpServlet {
             } else {
                 out.println(json.toJson(rep));
             }
-        } 
-        else if(rep instanceof String) {
+        } else if(rep instanceof String) {
             out.println(rep.toString());
         } else if (rep instanceof ModelView) {
             ModelView mv = (ModelView) rep;
