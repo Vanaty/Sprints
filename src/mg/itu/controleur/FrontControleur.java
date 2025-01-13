@@ -9,7 +9,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -99,15 +102,28 @@ public class FrontControleur extends HttpServlet {
         return requestUrl;
     }
 
-    protected void sendResponse(Mapping mapping, HttpServletRequest request, HttpServletResponse response) throws Exception {
+    protected String getVeritableUrl(String url) throws URISyntaxException {
+        URI uri = new URI(getServletContext().getContextPath());
+        return uri.resolve(url).toString();
+    }
+
+    protected void handleResponse(Mapping mapping, HttpServletRequest request, HttpServletResponse response) throws Exception {
         PrintWriter out = response.getWriter();
+        System.out.println(request.getParameter("emp.name"));
         // Gestion de reponse
         Object rep = mapping.getResponse(request);
         if(rep == null) {
             response.sendError(HttpServletResponse.SC_NO_CONTENT, "Pas de type de retour");
             return;
         }
-        if (mapping.isRestapi(request.getMethod())) {
+        //Validation error
+        if (rep instanceof HttpServletRequest) {
+            String link = (String) request.getSession().getAttribute(Mapping.ATR_VALIDATION);
+            if(link == null){ response.sendError(500, "Page validation erreur non configurer"); return;}
+            link = getVeritableUrl(link);
+            RequestDispatcher dispatcher = ((HttpServletRequest) rep).getRequestDispatcher(link);
+            dispatcher.forward((HttpServletRequest) rep, response);
+        } else if (mapping.isRestapi(request.getMethod())) {
             response.setContentType("text/json");
             Gson json = new Gson();
             if (rep instanceof ModelView) {
@@ -136,7 +152,6 @@ public class FrontControleur extends HttpServlet {
         try {
             String requestUrl = getRequestUrl(request);
             Mapping mapping = controleurs.getOrDefault(requestUrl, null);
-
             if (mapping == null) {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND,  "La ressource demandée ["+requestUrl+"] n'est pas disponible");
                 return;
@@ -147,7 +162,7 @@ public class FrontControleur extends HttpServlet {
                 return;
             }
 
-            sendResponse(mapping, request, response);
+            handleResponse(mapping, request, response);
         } catch (Exception e) {
             throw new ServletException(e);
         }
