@@ -32,7 +32,6 @@ import mg.itu.util.Mapping;
 public class FrontControleur extends HttpServlet {
     private final String INIT_PACKAGE = "package_controleur";
 
-
     private Map<String, Mapping> controleurs = new HashMap<>();
 
     private void scannePackage(String cPackage) throws Exception {

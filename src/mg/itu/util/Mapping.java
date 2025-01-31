@@ -94,8 +94,12 @@ public class Mapping {
 
     public Object getResponse(HttpServletRequest request) throws Exception {
         VerbAction va = getVerbAction(request.getMethod());
-        Object instance = getInstance(va.getCls());
         Method method = va.getMethod();
+        if (!va.getSecurity().isGranted(request)) {
+            throw new Exception("Access refuser!");
+        }
+
+        Object instance = getInstance(va.getCls());
         Parameter[] parameters = method.getParameters();
 
         injectSession(instance, request);
