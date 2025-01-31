@@ -15,8 +15,8 @@ public class Validator {
             Range range = field.getAnnotation(Range.class);
             double min = range.min();
             double max = range.max();
-
             Object value = field.get(object);
+            System.out.println(field.getName() + value.toString());
             if (value instanceof Number) {
                 double doubleValue = Double.parseDouble(value.toString());
                 if (doubleValue < min || doubleValue > max) {
