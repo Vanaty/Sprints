@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ModelView {
+    protected String callbackValidation;
     String urlDestination;
     Map<String,Object> data;
     
@@ -22,6 +23,14 @@ public class ModelView {
         data = new HashMap<>();
     }
 
+    public void setCallbackValidation(String val) {
+        this.callbackValidation = val;
+    }
+
+    public String getCallbackValidation() {
+        return callbackValidation;
+    }
+
     protected String getUrlDestionation() {
         return urlDestination;
     }
@@ -32,6 +41,10 @@ public class ModelView {
 
     public void addObject(String nom, Object o) {
         this.data.put(nom, o);
+    }
+
+    public Object getObject(String nom) {
+        return this.data.getOrDefault(nom, null);
     }
 
     protected void setAttributs(HttpServletRequest request) {

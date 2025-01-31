@@ -9,14 +9,18 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.Part;
 import mg.itu.annotation.Param;
 import mg.itu.annotation.Restapi;
+import mg.itu.controleur.ModelView;
 import mg.itu.exception.ValidatorException;
 
 public class Mapping {
+    public static final String ATR_VALIDATION = "validation";
     List<VerbAction> verbActions = new ArrayList<>();
 
     public void addVerbAction(String verb,Class <?> cls, Method method) throws Exception {
@@ -29,16 +33,29 @@ public class Mapping {
 
     private Object cast(Class<?> type, Object value) {
         String typeName = type.getSimpleName().toLowerCase();
-        if (typeName.contains("int")) {
-            return Integer.parseInt(value.toString());
-        } else if (typeName.equals("double")) {
-            return Double.parseDouble(value.toString());
-        } else if (typeName.equals("float")) {
-            return Float.parseFloat(value.toString());
-        } else if (typeName.equals("boolean")) {
-            return Boolean.parseBoolean(value.toString());
+        try {
+            if (typeName.contains("int")) {
+                return Integer.parseInt(value.toString());
+            } else if (typeName.equals("double")) {
+                return Double.parseDouble(value.toString());
+            } else if (typeName.equals("float")) {
+                return Float.parseFloat(value.toString());
+            } else if (typeName.equals("boolean")) {
+                return Boolean.parseBoolean(value.toString());
+            }
+            return value;
+        } catch (Exception e) {
+            if (typeName.contains("int")) {
+                return 0;
+            } else if (typeName.equals("double")) {
+                return 0;
+            } else if (typeName.equals("float")) {
+                return 0;
+            } else if (typeName.equals("boolean")) {
+                return Boolean.FALSE;
+            }
+            return value;
         }
-        return value;
     }
 
 
@@ -65,31 +82,54 @@ public class Mapping {
     }
 
     protected void injectPartOnModel(HttpServletRequest request, Map<String,Object> models) throws Exception {
-        Collection<Part> parts =  request.getParts();
-        for (Part part : parts) {
-            String fileName = part.getName();
-            String[] data = fileName.split("\\.");
+        try{
+            Collection<Part> parts =  request.getParts();
+            for (Part part : parts) {
+                String fileName = part.getName();
+                String[] data = fileName.split("\\.");
 
-            //Object 
-            if (data.length > 1) {
-                Object model = models.get(data[0]);
-                Method m = getMethod(model.getClass(), data[1]);
-                try {
-                    m.invoke(model, new Fichier(part));
-                } catch(Exception e) {
-                    continue;
+                //Object 
+                if (data.length > 1) {
+                    Object model = models.get(data[0]);
+                    Method m = getMethod(model.getClass(), data[1]); 
+                    try {
+                        m.invoke(model, new Fichier(part));
+                    } catch(Exception e) {
+                        continue;
+                    }
                 }
             }
+        } catch(Exception e) {
+            return;
         }
     }
 
-    public void validerMapObject(Map<String, Object> models) throws IllegalAccessException {
+    public HttpServletRequest validerMapObject(Map<String, Object> models, HttpServletRequest request) throws IllegalAccessException {
         Map<String,ValidatorException> validations = Validator.controllerMap(models);
-        for (ValidatorException ve : validations.values()) {
+        ValidatorException errors = new ValidatorException();
+        boolean error = false;
+        for (String param : validations.keySet()) {
+            ValidatorException ve = validations.get(param);
             if (ve.issetError()) {
-                System.out.println(ve.getMessage());
+                error = true;
+            }
+            for (String arg : ve.getErreurs().keySet()) {
+                System.out.println(param+"."+arg+": "+ve.getInputVal(arg)+" error: "+ve.getInputError(arg));
+                errors.add(param+"."+arg, ve.getInputVal(arg), ve.getInputError(arg));
             }
         }
+        if (error) {
+            request.setAttribute(ATR_VALIDATION, errors);
+            HttpServletRequestWrapper req = new HttpServletRequestWrapper (request) {
+                @Override
+                public String getMethod() {
+                    return "GET";
+                }
+            };
+            req.setAttribute(ATR_VALIDATION, errors);
+            return req;
+        }
+        return null;
     }
 
     public Object getResponse(HttpServletRequest request) throws Exception {
@@ -132,8 +172,10 @@ public class Mapping {
         }
 
         Enumeration<String> values = request.getParameterNames();
+        System.out.println("\n"+request.getParameter("emp.name"));
         while (values.hasMoreElements()) {
             String reqKey = values.nextElement();
+            System.out.println("\n\n"+reqKey);
             String[] data = reqKey.split("\\.");
 
             for (int i = 0; i < parameters.length; i++) {
@@ -147,7 +189,9 @@ public class Mapping {
                 if (paramKey.equals(data[0]) && data.length > 1) {
                     Object model = mapInstances.get(data[0]);
                     Method m = getMethod(model.getClass(), data[1]);
+                    System.out.println(m.getName() +"Value["+ reqKey +"]: "+ request.getParameter(reqKey));
                     Object value = cast(m.getParameterTypes()[0], request.getParameter(reqKey));
+                    System.out.println(m.getName()+ value.toString());
                     m.invoke(model, value);
                 } else if(paramKey.equals(reqKey)) {
                     paramValues[i] = cast(parameters[i].getType(), request.getParameter(reqKey));
@@ -155,8 +199,19 @@ public class Mapping {
             }
         }
         injectPartOnModel(request, mapInstances);
-        validerMapObject(mapInstances);
-        return method.invoke(instance, paramValues);
+        
+        Object rep = method.invoke(instance, paramValues);
+        Object repValidation = validerMapObject(mapInstances, request);
+        if (repValidation != null) {
+            return repValidation;
+        }
+
+        if (rep != null && rep instanceof ModelView) {
+            ModelView mv = (ModelView) rep;
+            request.getSession().setAttribute(ATR_VALIDATION, mv.getCallbackValidation());
+            if (request.getAttribute(ATR_VALIDATION) == null) mv.addObject(ATR_VALIDATION, new ValidatorException());
+        }
+        return rep;
     }
 
     private String getParameterName(Method method, Parameter param) throws Exception {
@@ -185,7 +240,7 @@ public class Mapping {
     }
 
     public boolean isMethodAllowed(String method) {
-        for (VerbAction verbAction : verbActions) {
+        for (VerbAction verbAction: verbActions) {
             if (verbAction.isVerbAllowed(method)) {
                 return true;
             }
