@@ -12,7 +12,6 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,6 +28,7 @@ import mg.itu.annotation.Controleur;
 import mg.itu.annotation.GET;
 import mg.itu.annotation.POST;
 import mg.itu.annotation.Url;
+import mg.itu.security.handler.SecurityHandler;
 import mg.itu.util.Mapping;
 
 @MultipartConfig
@@ -148,6 +148,7 @@ public class FrontControleur extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
+        SecurityHandler.request = request;
         try {
             String requestUrl = getRequestUrl(request);
             Mapping mapping = controleurs.getOrDefault(requestUrl, null);
