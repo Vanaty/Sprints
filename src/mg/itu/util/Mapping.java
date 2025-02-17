@@ -9,7 +9,6 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
@@ -134,8 +133,12 @@ public class Mapping {
 
     public Object getResponse(HttpServletRequest request) throws Exception {
         VerbAction va = getVerbAction(request.getMethod());
-        Object instance = getInstance(va.getCls());
         Method method = va.getMethod();
+        if (!va.getSecurity().isGranted(request)) {
+            throw new Exception("Access refuser!");
+        }
+
+        Object instance = getInstance(va.getCls());
         Parameter[] parameters = method.getParameters();
 
         injectSession(instance, request);
