@@ -91,6 +91,9 @@ public class FrontControleur extends HttpServlet {
                 if(methodes[j].isAnnotationPresent(GET.class)) {
                     map.addVerbAction("GET", c, methodes[j]);
                 }
+                if(!methodes[j].isAnnotationPresent(GET.class) && !methodes[j].isAnnotationPresent(POST.class)) {
+                    map.addVerbAction("GET", c, methodes[j]);
+                }
                 controleurs.put(url, map);
             }
         }
@@ -150,7 +153,7 @@ public class FrontControleur extends HttpServlet {
         SecurityHandler.request = request;
         try {
             String requestUrl = getRequestUrl(request);
-            Mapping mapping = controleurs.getOrDefault(requestUrl, null);
+            Mapping mapping = controleurs.getOrDefault(requestUrl, null); 
             if (mapping == null) {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND,  "La ressource demandée ["+requestUrl+"] n'est pas disponible");
                 return;
