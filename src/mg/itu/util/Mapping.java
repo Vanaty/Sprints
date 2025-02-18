@@ -16,6 +16,7 @@ import jakarta.servlet.http.Part;
 import mg.itu.annotation.Param;
 import mg.itu.annotation.Restapi;
 import mg.itu.controleur.ModelView;
+import mg.itu.exception.ReponseException;
 import mg.itu.exception.ValidatorException;
 
 public class Mapping {
@@ -135,7 +136,7 @@ public class Mapping {
         VerbAction va = getVerbAction(request.getMethod());
         Method method = va.getMethod();
         if (!va.getSecurity().isGranted(request)) {
-            throw new Exception("Access refuser!");
+            throw new ReponseException(403, new Exception("Access refusee"), va.getSecurity().getErrorPage());
         }
 
         Object instance = getInstance(va.getCls());

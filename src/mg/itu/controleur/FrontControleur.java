@@ -12,6 +12,8 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,6 +30,7 @@ import mg.itu.annotation.Controleur;
 import mg.itu.annotation.GET;
 import mg.itu.annotation.POST;
 import mg.itu.annotation.Url;
+import mg.itu.exception.ReponseException;
 import mg.itu.security.handler.SecurityHandler;
 import mg.itu.util.Mapping;
 
@@ -73,7 +76,8 @@ public class FrontControleur extends HttpServlet {
         for (int j = 0; j < methodes.length; j++) {
             Url annotUrl = methodes[j].getAnnotation(Url.class);
             if ( annotUrl !=null ) {
-                String url = (annotUrl.value().charAt(0) == '/') ? annotUrl.value() : "/" + annotUrl.value();
+                URI uri = new URI(Paths.get(this.getServletContext().getContextPath(), annotUrl.value()).toString().replace("\\","/"));
+                String url = uri.getPath();
                 Mapping map;
                 if (controleurs.containsKey(url)) {
                     map = controleurs.get(url);
@@ -92,12 +96,8 @@ public class FrontControleur extends HttpServlet {
         }
     }
 
-    private String getRequestUrl(HttpServletRequest request) {
-        String urlPattern = request.getHttpServletMapping().getPattern().replace("*", "");
-        String requestUrl = request.getRequestURI()
-                            .replace(request.getContextPath(), "")
-                            .replace(urlPattern,"");
-        requestUrl = (requestUrl.startsWith("/")) ? requestUrl : "/" + requestUrl;
+    private String getRequestUrl(HttpServletRequest request) throws URISyntaxException {
+        String requestUrl = new URI(request.getRequestURI()).getPath();
         return requestUrl;
     }
 
@@ -163,6 +163,15 @@ public class FrontControleur extends HttpServlet {
             }
 
             handleResponse(mapping, request, response);
+        } catch(ReponseException e){
+            String pageRed = e.getPageRedirection();
+            if (pageRed != null && !pageRed.isEmpty()) {
+                RequestDispatcher rd =  request.getRequestDispatcher(pageRed);
+                request.setAttribute("exception", e);
+                rd.forward(request, response);
+            } else {
+                response.sendError(e.getStatusCode(), e.getMessage());
+            }
         } catch (Exception e) {
             throw new ServletException(e);
         }
