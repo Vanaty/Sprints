@@ -108,7 +108,6 @@ public class FrontControleur extends HttpServlet {
 
     protected void handleResponse(Mapping mapping, HttpServletRequest request, HttpServletResponse response) throws Exception {
         PrintWriter out = response.getWriter();
-        System.out.println(request.getParameter("emp.name"));
         // Gestion de reponse
         Object rep = mapping.getResponse(request);
         if(rep == null) {

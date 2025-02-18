@@ -114,7 +114,6 @@ public class Mapping {
                 error = true;
             }
             for (String arg : ve.getErreurs().keySet()) {
-                System.out.println(param+"."+arg+": "+ve.getInputVal(arg)+" error: "+ve.getInputError(arg));
                 errors.add(param+"."+arg, ve.getInputVal(arg), ve.getInputError(arg));
             }
         }
@@ -172,10 +171,8 @@ public class Mapping {
         }
 
         Enumeration<String> values = request.getParameterNames();
-        System.out.println("\n"+request.getParameter("emp.name"));
         while (values.hasMoreElements()) {
             String reqKey = values.nextElement();
-            System.out.println("\n\n"+reqKey);
             String[] data = reqKey.split("\\.");
 
             for (int i = 0; i < parameters.length; i++) {
@@ -189,9 +186,7 @@ public class Mapping {
                 if (paramKey.equals(data[0]) && data.length > 1) {
                     Object model = mapInstances.get(data[0]);
                     Method m = getMethod(model.getClass(), data[1]);
-                    System.out.println(m.getName() +"Value["+ reqKey +"]: "+ request.getParameter(reqKey));
                     Object value = cast(m.getParameterTypes()[0], request.getParameter(reqKey));
-                    System.out.println(m.getName()+ value.toString());
                     m.invoke(model, value);
                 } else if(paramKey.equals(reqKey)) {
                     paramValues[i] = cast(parameters[i].getType(), request.getParameter(reqKey));
