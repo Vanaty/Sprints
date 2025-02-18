@@ -8,6 +8,7 @@ import mg.itu.security.User;
 
 public class SecurityHandler {
     private Method method;
+    private String errorPage;
     public static String SESSION_USER = "user";
     public static HttpServletRequest request;
     
@@ -32,6 +33,14 @@ public class SecurityHandler {
         }
     }
 
+    public void setErrorPage(String errorPage) {
+        this.errorPage = errorPage;
+    }
+
+    public String getErrorPage() {
+        return errorPage;
+    }
+
     public boolean isGranted(HttpServletRequest request) throws Exception {
         boolean reqAuth = requireAuth();
         Object userObject = request.getSession().getAttribute(SecurityHandler.SESSION_USER);
@@ -40,17 +49,27 @@ public class SecurityHandler {
         } else if (userObject == null && reqAuth) {
             return false;
         }
+        Security secClass = method.getDeclaringClass().getAnnotation(Security.class);
+        Security secMethod = method.getAnnotation(Security.class);
+        boolean isGranted = true;
 
         try{
             User user = (User) userObject;
-            Security sec = method.getAnnotation(Security.class);
-            if (user.getLevelUser() < sec.levelUser()) {
-                return false;
+            if (secClass != null && user.getLevelUser() < secClass.levelUser()) {
+                isGranted = false;
+                setErrorPage(secClass.errorPage());
+            }
+
+            if (secMethod != null && user.getLevelUser() < secMethod.levelUser()) {
+                isGranted = false;
+                setErrorPage(secMethod.errorPage());
+            } else if (secMethod != null) {
+                isGranted = true;
             }
         } catch(Exception e) {
             throw new Exception(String.format("User doit etre une instance de [%s]", User.class.getName()));
         }
-        return true;
+        return isGranted;
     }
 
 }
