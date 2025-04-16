@@ -10,7 +10,7 @@ set "src=%work_dir%\src"
 set "libs=%work_dir%\lib"
 
 @REM CHEMIN AMETRAHANA ANLE LIB
-set "lib=%work_dir%\test\lib"
+set "lib=D:\S5\MrNaina\ticketing\lib"
 
 
 :: Effacer le dossier [temp]

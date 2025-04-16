@@ -9,7 +9,7 @@ import mg.itu.security.User;
 public class SecurityHandler {
     private Method method;
     private String errorPage;
-    public static String SESSION_USER = "user";
+    public static String SESSION_USER = "user_xxxxxxxxx";
     public static HttpServletRequest request;
     
     public SecurityHandler(Method method) {
@@ -19,12 +19,13 @@ public class SecurityHandler {
     public Method getMethod() {
         return method;
     }
+    
     public void setMethod(Method method) {
         this.method = method;
     }
 
     public boolean requireAuth() {
-        return method.isAnnotationPresent(Security.class);
+        return method.isAnnotationPresent(Security.class) || method.getDeclaringClass().isAnnotationPresent(Security.class);
     }
 
     public static void saveUser(User user) {
@@ -32,6 +33,22 @@ public class SecurityHandler {
             request.getSession().setAttribute(SecurityHandler.SESSION_USER, user);
         }
     }
+
+    public static void removeUser() {
+        if (request != null) {
+            request.getSession().removeAttribute(SecurityHandler.SESSION_USER);
+        }
+    }
+
+    public static User getUser() {
+        if (request != null) {
+            User u = (User) request.getSession().getAttribute(SecurityHandler.SESSION_USER);
+            if(u != null) return u;
+        }
+        return null;
+    }
+
+
 
     public void setErrorPage(String errorPage) {
         this.errorPage = errorPage;
@@ -44,25 +61,26 @@ public class SecurityHandler {
     public boolean isGranted(HttpServletRequest request) throws Exception {
         boolean reqAuth = requireAuth();
         Object userObject = request.getSession().getAttribute(SecurityHandler.SESSION_USER);
+        
+        Security secClass = method.getDeclaringClass().getAnnotation(Security.class);
+        Security secMethod = method.getAnnotation(Security.class);
+        if (secClass != null) setErrorPage(secClass.errorPage());
+        if (secMethod != null) setErrorPage(secMethod.errorPage());
         if (!reqAuth) {
             return true;
         } else if (userObject == null && reqAuth) {
             return false;
         }
-        Security secClass = method.getDeclaringClass().getAnnotation(Security.class);
-        Security secMethod = method.getAnnotation(Security.class);
         boolean isGranted = true;
 
         try{
             User user = (User) userObject;
             if (secClass != null && user.getLevelUser() < secClass.levelUser()) {
                 isGranted = false;
-                setErrorPage(secClass.errorPage());
             }
 
             if (secMethod != null && user.getLevelUser() < secMethod.levelUser()) {
                 isGranted = false;
-                setErrorPage(secMethod.errorPage());
             } else if (secMethod != null) {
                 isGranted = true;
             }

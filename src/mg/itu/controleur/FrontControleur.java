@@ -12,12 +12,15 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletContext;
@@ -26,6 +29,9 @@ import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import mg.itu.adapter.LocalDateAdapter;
+import mg.itu.adapter.LocalDateTimeAdapter;
+import mg.itu.adapter.LocalTimeAdapter;
 import mg.itu.annotation.Controleur;
 import mg.itu.annotation.GET;
 import mg.itu.annotation.POST;
@@ -73,11 +79,13 @@ public class FrontControleur extends HttpServlet {
 
     private void setMapping(Class<?> c) throws Exception {
         Method[] methodes = c.getMethods();
+        String bas_url = c.getAnnotation(Controleur.class).path();
         for (int j = 0; j < methodes.length; j++) {
             Url annotUrl = methodes[j].getAnnotation(Url.class);
             if ( annotUrl !=null ) {
-                URI uri = new URI(Paths.get(this.getServletContext().getContextPath(), annotUrl.value()).toString().replace("\\","/"));
+                URI uri = Paths.get(this.getServletContext().getContextPath(),bas_url, annotUrl.value()).toUri();
                 String url = uri.getPath();
+                System.out.println("[SCAN]: "+ url);
                 Mapping map;
                 if (controleurs.containsKey(url)) {
                     map = controleurs.get(url);
@@ -100,7 +108,7 @@ public class FrontControleur extends HttpServlet {
     }
 
     private String getRequestUrl(HttpServletRequest request) throws URISyntaxException {
-        String requestUrl = new URI(request.getRequestURI()).getPath();
+        String requestUrl = Paths.get(request.getRequestURI()).toUri().getPath();
         return requestUrl;
     }
 
@@ -126,7 +134,7 @@ public class FrontControleur extends HttpServlet {
             dispatcher.forward((HttpServletRequest) rep, response);
         } else if (mapping.isRestapi(request.getMethod())) {
             response.setContentType("text/json");
-            Gson json = new Gson();
+            Gson json = prepareGson();
             if (rep instanceof ModelView) {
                 ModelView mv = (ModelView) rep;
                 out.println(json.toJson(mv.getData()));
@@ -139,9 +147,10 @@ public class FrontControleur extends HttpServlet {
             out.println(rep.toString());
         } else if (rep instanceof ModelView) {
             ModelView mv = (ModelView) rep;
-            RequestDispatcher dispatcher = request.getRequestDispatcher(mv.getUrlDestionation());
-            mv.setAttributs(request);
-            dispatcher.forward(request, response);
+            mv.prepareRequestDispatcher(request);
+            RequestDispatcher dispatcher = mv.getDispatcher();
+            mv.setAttributs();
+            dispatcher.forward(mv.getRequest(), response);
         } else {
             response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Type de retour non supporter");
         }
@@ -165,14 +174,14 @@ public class FrontControleur extends HttpServlet {
             }
 
             handleResponse(mapping, request, response);
-        } catch(ReponseException e){
-            String pageRed = e.getPageRedirection();
+        } catch(ReponseException ee){
+            String pageRed = ee.getPageRedirection();
             if (pageRed != null && !pageRed.isEmpty()) {
                 RequestDispatcher rd =  request.getRequestDispatcher(pageRed);
-                request.setAttribute("exception", e);
+                request.setAttribute("exception", ee);
                 rd.forward(request, response);
             } else {
-                response.sendError(e.getStatusCode(), e.getMessage());
+                response.sendError(ee.getStatusCode(), ee.getMessage());
             }
         } catch (Exception e) {
             throw new ServletException(e);
@@ -191,6 +200,14 @@ public class FrontControleur extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         processRequest(request, response);
+    }
+
+    protected Gson  prepareGson() {
+        return new GsonBuilder()
+            .registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
+            .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
+            .registerTypeAdapter(LocalTime.class, new LocalTimeAdapter())
+            .create();
     }
 
     @Override
@@ -215,5 +232,9 @@ public class FrontControleur extends HttpServlet {
     public String getServletInfo() {
         return "Short description";
     }// </editor-fold>
+
+    public static void main(String[] args) {
+        System.err.println(Paths.get("gg","/","/").toUri().getPath());
+    }
 
 }

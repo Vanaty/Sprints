@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 
+import mg.itu.annotation.Param;
 import mg.itu.exception.ValidatorException;
 import mg.itu.validation.NotBlank;
 import mg.itu.validation.NotNull;
@@ -16,7 +17,6 @@ public class Validator {
             double min = range.min();
             double max = range.max();
             Object value = field.get(object);
-            System.out.println(field.getName() + value.toString());
             if (value instanceof Number) {
                 double doubleValue = Double.parseDouble(value.toString());
                 if (doubleValue < min || doubleValue > max) {
@@ -72,7 +72,8 @@ public class Validator {
     public static Map<String, ValidatorException> controllerMap(Map<String, Object> models) throws IllegalAccessException {
         Map<String, ValidatorException> exceptions = new HashMap<>();
         for (String param : models.keySet()) {
-            exceptions.put(param, Validator.controller(param, models.get(param)));
+            Object model = models.get(param);
+            exceptions.put(param, Validator.controller(param, model));
         }
         return exceptions;
     }
