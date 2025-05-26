@@ -3,12 +3,16 @@ package mg.itu.util;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.spi.LocaleNameProvider;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
@@ -34,6 +38,7 @@ public class Mapping {
     private Object cast(Class<?> type, Object value) {
         String typeName = type.getSimpleName().toLowerCase();
         try {
+            System.out.println("Type: " + typeName + " Value: " + value);
             if (typeName.contains("int")) {
                 return Integer.parseInt(value.toString());
             } else if (typeName.equals("double")) {
@@ -42,19 +47,17 @@ public class Mapping {
                 return Float.parseFloat(value.toString());
             } else if (typeName.equals("boolean")) {
                 return Boolean.parseBoolean(value.toString());
+            } else if (type.isAssignableFrom(LocalDate.class)) {
+                return LocalDate.parse(value.toString());
+            } else if (type.isAssignableFrom(LocalDateTime.class)) {
+                return LocalDateTime.parse(value.toString());
+            } else if (type.isAssignableFrom(LocalTime.class)) {
+                return LocalTime.parse(value.toString());
             }
-            return value;
+            return type.cast(value);
         } catch (Exception e) {
-            if (typeName.contains("int")) {
-                return 0;
-            } else if (typeName.equals("double")) {
-                return 0;
-            } else if (typeName.equals("float")) {
-                return 0;
-            } else if (typeName.equals("boolean")) {
-                return Boolean.FALSE;
-            }
-            return value;
+            System.out.println("Exception " + e.getMessage());
+            return null;
         }
     }
 
@@ -78,7 +81,11 @@ public class Mapping {
     }
 
     private Object getInstance(Class<?> c) throws Exception {
-        return c.getConstructor().newInstance();
+        try {
+            return c.getConstructor().newInstance();   
+        } catch (NoSuchMethodException e) {
+            return new Exception("Ajouter un constructuer vide dans votre classe");
+        }
     }
 
     protected void injectPartOnModel(HttpServletRequest request, Map<String,Object> models) throws Exception {
@@ -108,13 +115,14 @@ public class Mapping {
         Map<String,ValidatorException> validations = Validator.controllerMap(models);
         ValidatorException errors = new ValidatorException();
         boolean error = false;
+
+        //Ajouter tous les erreurs et values dans un unique instance ValidatorException
         for (String param : validations.keySet()) {
             ValidatorException ve = validations.get(param);
             if (ve.issetError()) {
                 error = true;
             }
             for (String arg : ve.getErreurs().keySet()) {
-                System.out.println(param+"."+arg+": "+ve.getInputVal(arg)+" error: "+ve.getInputError(arg));
                 errors.add(param+"."+arg, ve.getInputVal(arg), ve.getInputError(arg));
             }
         }
@@ -132,6 +140,20 @@ public class Mapping {
         return null;
     }
 
+    private boolean isPrimitive(Class<?> t) {
+        if (t.isPrimitive()) {
+            return true;
+        }
+    
+        if (t == Boolean.class || t == Integer.class || t == Double.class || t == Float.class ||
+            t == Long.class || t == String.class || t == Character.class) {
+            return true;
+        }
+    
+        return false;
+    }
+    
+
     public Object getResponse(HttpServletRequest request) throws Exception {
         VerbAction va = getVerbAction(request.getMethod());
         Method method = va.getMethod();
@@ -146,6 +168,7 @@ public class Mapping {
 
         // instance non Primitive Parameter
         Map<String, Object> mapInstances =  new HashMap<>();
+        Map<String, Object> modelValidations = new HashMap<>();
         //Argument anle method controleur
         Object[] paramValues = new Object[method.getParameterCount()];
 
@@ -161,25 +184,29 @@ public class Mapping {
                 continue;
             }
 
-            if (parameters[index].getType().isPrimitive()) {
+            if (isPrimitive(parameters[index].getType())) {
                 continue;
             }
 
             String key = getParameterName(method, parameters[index]);
             Object model = getInstance(parameters[index].getType());
+            
+            //Instance model
             mapInstances.put(key, model);
             paramValues[index] = model;
+            
+            //Ajouter les models a valider
+            Param p = parameters[index].getAnnotation(Param.class);
+            if (p != null && p.ignorValidation()) continue;
+            modelValidations.put(key, model);
         }
-
         Enumeration<String> values = request.getParameterNames();
-        System.out.println("\n"+request.getParameter("emp.name"));
         while (values.hasMoreElements()) {
             String reqKey = values.nextElement();
-            System.out.println("\n\n"+reqKey);
             String[] data = reqKey.split("\\.");
 
             for (int i = 0; i < parameters.length; i++) {
-                if (parameters[i].getType().getName().equals(Session.class.getName())) {
+                if (parameters[i].getType().equals(Session.class)) {
                     continue;
                 }
 
@@ -189,19 +216,21 @@ public class Mapping {
                 if (paramKey.equals(data[0]) && data.length > 1) {
                     Object model = mapInstances.get(data[0]);
                     Method m = getMethod(model.getClass(), data[1]);
-                    System.out.println(m.getName() +"Value["+ reqKey +"]: "+ request.getParameter(reqKey));
                     Object value = cast(m.getParameterTypes()[0], request.getParameter(reqKey));
-                    System.out.println(m.getName()+ value.toString());
-                    m.invoke(model, value);
+                    if (value != null) m.invoke(model, value);
                 } else if(paramKey.equals(reqKey)) {
-                    paramValues[i] = cast(parameters[i].getType(), request.getParameter(reqKey));
+                    if(parameters[i].getType().isArray()) {
+                        paramValues[i] = cast(parameters[i].getType(), request.getParameterValues(reqKey));
+                    } else {
+                        paramValues[i] = cast(parameters[i].getType(), request.getParameter(reqKey));
+                    }
                 }
             }
         }
         injectPartOnModel(request, mapInstances);
         
         Object rep = method.invoke(instance, paramValues);
-        Object repValidation = validerMapObject(mapInstances, request);
+        Object repValidation = validerMapObject(modelValidations, request);
         if (repValidation != null) {
             return repValidation;
         }
@@ -225,10 +254,20 @@ public class Mapping {
     }
 
     private Method getMethod(Class<?> c, String fieldName) throws Exception {
-        Class<?> fieldType = c.getDeclaredField(fieldName).getType();
-        String fieldSetter = toSetters(fieldName);
-        return c.getMethod(fieldSetter, fieldType);
+        while (c != null) {
+            try {
+                Field field = c.getDeclaredField(fieldName);
+                Class<?> fieldType = field.getType();
+                String fieldSetter = toSetters(fieldName);
+                return c.getMethod(fieldSetter, fieldType);
+            } catch (NoSuchFieldException e) {
+                c = c.getSuperclass();
+            }
+        }
+
+        throw new NoSuchMethodException("Setter not found for field: " + fieldName);
     }
+
 
     public boolean isRestapi(String verb) throws ClassNotFoundException, NoSuchMethodException, SecurityException {
         Method method = getVerbAction(verb).getMethod();

@@ -9,4 +9,5 @@ import java.lang.annotation.RetentionPolicy;
 @Target(ElementType.PARAMETER)
 public @interface Param {
     public String value();
+    public boolean ignorValidation() default false;
 }
