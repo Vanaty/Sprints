@@ -38,6 +38,7 @@ public class Mapping {
     private Object cast(Class<?> type, Object value) {
         String typeName = type.getSimpleName().toLowerCase();
         try {
+            System.out.println("Type: " + typeName + " Value: " + value);
             if (typeName.contains("int")) {
                 return Integer.parseInt(value.toString());
             } else if (typeName.equals("double")) {
@@ -55,6 +56,7 @@ public class Mapping {
             }
             return type.cast(value);
         } catch (Exception e) {
+            System.out.println("Exception " + e.getMessage());
             return null;
         }
     }
