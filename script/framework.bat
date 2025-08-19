@@ -31,7 +31,7 @@ dir /s /B "%libs%\*.jar" > libs.txt
 set "classpath="
 for /F "delims=" %%i in (libs.txt) do set "classpath=!classpath!%%i;"
 :: Exécuter la commande javac
-javac -d "%temp%\classes" -cp "%classpath%" @sources.txt
+javac -encoding UTF-8 -d "%temp%\classes" -cp "%classpath%" @sources.txt
 :: Supprimer les fichiers sources.txt et libs.txt après la compilation
 del sources.txt
 del libs.txt

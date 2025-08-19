@@ -118,7 +118,6 @@ public class FrontControleur extends HttpServlet {
     }
 
     protected void handleResponse(Mapping mapping, HttpServletRequest request, HttpServletResponse response) throws Exception {
-        PrintWriter out = response.getWriter();
         // Gestion de reponse
         Object rep = mapping.getResponse(request);
         if(rep == null) {
@@ -133,6 +132,7 @@ public class FrontControleur extends HttpServlet {
             RequestDispatcher dispatcher = ((HttpServletRequest) rep).getRequestDispatcher(link);
             dispatcher.forward((HttpServletRequest) rep, response);
         } else if (mapping.isRestapi(request.getMethod())) {
+            PrintWriter out = response.getWriter();
             response.setContentType("text/json");
             Gson json = prepareGson();
             if (rep instanceof ModelView) {
@@ -144,6 +144,7 @@ public class FrontControleur extends HttpServlet {
                 out.println(json.toJson(rep));
             }
         } else if(rep instanceof String) {
+            PrintWriter out = response.getWriter();
             out.println(rep.toString());
         } else if (rep instanceof ModelView) {
             ModelView mv = (ModelView) rep;
@@ -151,6 +152,12 @@ public class FrontControleur extends HttpServlet {
             RequestDispatcher dispatcher = mv.getDispatcher();
             mv.setAttributs();
             dispatcher.forward(mv.getRequest(), response);
+        } else if(rep instanceof mg.itu.util.File) {
+            mg.itu.util.File file = (mg.itu.util.File) rep;
+            response.setContentType(file.getContentType());
+            response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getName() + "\"");
+            response.setContentLength(file.getContent().length);
+            response.getOutputStream().write(file.getContent());
         } else {
             response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Type de retour non supporter");
         }
@@ -164,12 +171,20 @@ public class FrontControleur extends HttpServlet {
             String requestUrl = getRequestUrl(request);
             Mapping mapping = controleurs.getOrDefault(requestUrl, null); 
             if (mapping == null) {
-                response.sendError(HttpServletResponse.SC_NOT_FOUND,  "La ressource demandée ["+requestUrl+"] n'est pas disponible");
+                // response.sendError(HttpServletResponse.SC_NOT_FOUND,  "La ressource demandée ["+requestUrl+"] n'est pas disponible");
+                renderErrorPage(response,
+                    HttpServletResponse.SC_NOT_FOUND,
+                    "La ressource demandée ["+requestUrl+"] n'est pas disponible",
+                    requestUrl);
+
                 return;
             }
 
             if (!mapping.isMethodAllowed(request.getMethod())) {
-                response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+                renderErrorPage(response,
+                        HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+                        "Méthode HTTP non autorisée",
+                        request.getRequestURI());
                 return;
             }
 
@@ -184,7 +199,11 @@ public class FrontControleur extends HttpServlet {
                 response.sendError(ee.getStatusCode(), ee.getMessage());
             }
         } catch (Exception e) {
-            throw new ServletException(e);
+            renderErrorPage(response,
+                HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                e.getMessage(),
+                request.getRequestURI()
+            );
         }
     }
 
@@ -222,6 +241,43 @@ public class FrontControleur extends HttpServlet {
             throw new ServletException(e);
         }
     }
+
+    private void renderErrorPage(HttpServletResponse response,
+                             int statusCode,
+                             String message,
+                             String requestUri) throws IOException {
+        response.setStatus(statusCode);
+        response.setContentType("text/html;charset=UTF-8");
+
+        try (PrintWriter out = response.getWriter()) {
+            out.println("<!DOCTYPE html>");
+            out.println("<html lang='fr'>");
+            out.println("<head>");
+            out.println("<meta charset='UTF-8'>");
+            out.println("<title>Erreur - Mon Application</title>");
+            out.println("<style>");
+            out.println("body { font-family: Arial, sans-serif; background:#f8f8f8; text-align:center; padding-top:50px; }");
+            out.println(".error-box { background:#fff; border:1px solid #ddd; border-radius:12px; display:inline-block; padding:30px; box-shadow:0 2px 8px rgba(0,0,0,0.1);} ");
+            out.println("h1 { color:#e74c3c; }");
+            out.println(".code { font-size:22px; margin:15px 0; }");
+            out.println(".message { color:#555; }");
+            out.println("a { margin-top:20px; display:inline-block; text-decoration:none; color:#3498db; }");
+            out.println("</style>");
+            out.println("</head>");
+            out.println("<body>");
+            out.println("<div class='error-box'>");
+            out.println("<h1>⚠️ Une erreur est survenue</h1>");
+            out.println("<div class='code'>Code d'erreur : <strong>" + statusCode + "</strong></div>");
+            out.println("<div class='message'>Message : " + (message != null ? message : "Erreur inconnue") + "</div>");
+            out.println("<div class='uri'>URL demandée : " + (requestUri != null ? requestUri : "") + "</div>");
+            out.println("<a href='" + response.encodeURL("/") + "'>⬅ Retour à l'accueil</a>");
+            out.println("</div>");
+            out.println("</body>");
+            out.println("</html>");
+        }
+    }
+
+
 
     /**
      * Returns a short description of the servlet.
